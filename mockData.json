@@ -1,0 +1,202 @@
+[
+  {
+    "city_name": "okara",
+    "hotel_name": "Hotel One Okara",
+    "category": "Deals",
+    "subcategory": "BEST DEALS EVER!",
+    "product_name": "Mega Saver Deal",
+    "product_img": "https://source.unsplash.com/400x300/?pizza-combo",
+    "product_desc": "2 Regular pizzas with fries and 1L drink.",
+    "product_prize": "17$"
+  },
+  {
+    "city_name": "okara",
+    "hotel_name": "Hotel One Okara",
+    "category": "Deals",
+    "subcategory": "EPIC MEDIUM DEAL",
+    "product_name": "Medium Duo Feast",
+    "product_img": "https://source.unsplash.com/400x300/?medium-pizza-slice",
+    "product_desc": "2 Medium classic pizzas with garlic bread.",
+    "product_prize": "21$"
+  },
+  {
+    "city_name": "okara",
+    "hotel_name": "Hotel One Okara",
+    "category": "Deals",
+    "subcategory": "EPIC LARGE DEAL",
+    "product_name": "Large Celebration Box",
+    "product_img": "https://source.unsplash.com/400x300/?large-pepperoni-pizza",
+    "product_desc": "2 Large favorite pizzas with wings.",
+    "product_prize": "30$"
+  },
+  {
+    "city_name": "okara",
+    "hotel_name": "Hotel One Okara",
+    "category": "Deals",
+    "subcategory": "GATHERING DEALS",
+    "product_name": "Friends Night Deal",
+    "product_img": "https://source.unsplash.com/400x300/?pizza-group",
+    "product_desc": "3 Large pizzas with 2 drinks.",
+    "product_prize": "33$"
+  },
+  {
+    "city_name": "okara",
+    "hotel_name": "Hotel One Okara",
+    "category": "Deals",
+    "subcategory": "PREMIUM DEALS",
+    "product_name": "Ultimate Premium Feast",
+    "product_img": "https://source.unsplash.com/400x300/?deluxe-pizza",
+    "product_desc": "Premium loaded pizzas with fries and wings.",
+    "product_prize": "42$"
+  },
+  {
+    "city_name": "okara",
+    "hotel_name": "Hotel One Okara",
+    "category": "pizza",
+    "subcategory": "CLASSIC FLAVORS",
+    "product_name": "Chicken Tikka Classic",
+    "product_img": "https://source.unsplash.com/400x300/?chicken-tikka-pizza",
+    "product_desc": "Traditional chicken tikka pizza with herbs.",
+    "product_prize": "12$"
+  },
+  {
+    "city_name": "okara",
+    "hotel_name": "Hotel One Okara",
+    "category": "pizza",
+    "subcategory": "FAVORITE FLAVORS",
+    "product_name": "Smoky BBQ Chicken",
+    "product_img": "https://source.unsplash.com/400x300/?bbq-chicken-pizza",
+    "product_desc": "BBQ chicken pizza with smoky sauce.",
+    "product_prize": "14$"
+  },
+  {
+    "city_name": "okara",
+    "hotel_name": "Hotel One Okara",
+    "category": "pizza",
+    "subcategory": "PREMIUM FLAVORS",
+    "product_name": "Creamy Alfredo Supreme",
+    "product_img": "https://source.unsplash.com/400x300/?alfredo-pizza",
+    "product_desc": "Creamy alfredo sauce with grilled chicken.",
+    "product_prize": "17$"
+  },
+  {
+    "city_name": "okara",
+    "hotel_name": "Hotel One Okara",
+    "category": "pizza",
+    "subcategory": "SUPER LOADED PIZZA",
+    "product_name": "Extreme Cheese Burst",
+    "product_img": "https://source.unsplash.com/400x300/?cheese-burst-pizza",
+    "product_desc": "Extra cheese burst crust with toppings overload.",
+    "product_prize": "19$"
+  },
+  {
+    "city_name": "okara",
+    "hotel_name": "Hotel One Okara",
+    "category": "pizza",
+    "subcategory": "HALF N HALF",
+    "product_name": "Tikka & Fajita Split",
+    "product_img": "https://source.unsplash.com/400x300/?mixed-pizza",
+    "product_desc": "Half chicken tikka and half chicken fajita.",
+    "product_prize": "16$"
+  },
+  {
+    "city_name": "okara",
+    "hotel_name": "Hotel One Okara",
+    "category": "Pizza Rolls",
+    "subcategory": "CLASSIC LOADED PIZZA ROLLS",
+    "product_name": "Cheesy Classic Rolls",
+    "product_img": "https://source.unsplash.com/400x300/?cheese-rolls",
+    "product_desc": "Classic rolls filled with mozzarella & herbs.",
+    "product_prize": "7$"
+  },
+  {
+    "city_name": "okara",
+    "hotel_name": "Hotel One Okara",
+    "category": "Pizza Rolls",
+    "subcategory": "FAVORITE LOADED PIZZA ROLL",
+    "product_name": "BBQ Loaded Rolls",
+    "product_img": "https://source.unsplash.com/400x300/?bbq-rolls",
+    "product_desc": "BBQ chicken stuffed pizza rolls.",
+    "product_prize": "9$"
+  },
+  {
+    "city_name": "okara",
+    "hotel_name": "Hotel One Okara",
+    "category": "Chicken",
+    "subcategory": "CHICKEN CORNER",
+    "product_name": "Hot & Crispy Bucket",
+    "product_img": "https://source.unsplash.com/400x300/?crispy-chicken",
+    "product_desc": "4 pieces crispy fried chicken bucket.",
+    "product_prize": "13$"
+  },
+  {
+    "city_name": "okara",
+    "hotel_name": "Hotel One Okara",
+    "category": "Chicken",
+    "subcategory": "CHICKEN CORNER",
+    "product_name": "Spicy Zinger Fillet",
+    "product_img": "https://source.unsplash.com/400x300/?chicken-fillet",
+    "product_desc": "Crispy spicy chicken fillet with dip.",
+    "product_prize": "8$"
+  },
+  {
+    "city_name": "okara",
+    "hotel_name": "Hotel One Okara",
+    "category": "Sides",
+    "subcategory": "FRIES",
+    "product_name": "Masala Fries",
+    "product_img": "https://source.unsplash.com/400x300/?spicy-fries",
+    "product_desc": "Crispy fries sprinkled with special masala.",
+    "product_prize": "5$"
+  },
+  {
+    "city_name": "okara",
+    "hotel_name": "Hotel One Okara",
+    "category": "Sides",
+    "subcategory": "BREADS",
+    "product_name": "Stuffed Garlic Bread",
+    "product_img": "https://source.unsplash.com/400x300/?stuffed-bread",
+    "product_desc": "Garlic bread stuffed with cheese.",
+    "product_prize": "6$"
+  },
+  {
+    "city_name": "okara",
+    "hotel_name": "Hotel One Okara",
+    "category": "My Box",
+    "subcategory": "MYBOX PIZZA",
+    "product_name": "MyBox Veggie Pizza",
+    "product_img": "https://source.unsplash.com/400x300/?veggie-pizza",
+    "product_desc": "Personal veggie pizza with fries.",
+    "product_prize": "9$"
+  },
+  {
+    "city_name": "okara",
+    "hotel_name": "Hotel One Okara",
+    "category": "My Box",
+    "subcategory": "MYBOX MELT",
+    "product_name": "MyBox Chicken Melt",
+    "product_img": "https://source.unsplash.com/400x300/?chicken-melt",
+    "product_desc": "Chicken melt sandwich with drink.",
+    "product_prize": "10$"
+  },
+  {
+    "city_name": "okara",
+    "hotel_name": "Hotel One Okara",
+    "category": "My Box",
+    "subcategory": "MYBOX PIZZA ROLLS",
+    "product_name": "MyBox Spicy Rolls",
+    "product_img": "https://source.unsplash.com/400x300/?spicy-rolls",
+    "product_desc": "Spicy pizza rolls combo with fries.",
+    "product_prize": "11$"
+  },
+  {
+    "city_name": "okara",
+    "hotel_name": "Hotel One Okara",
+    "category": "Deals",
+    "subcategory": "DAILY DEAL",
+    "product_name": "Quick Lunch Deal",
+    "product_img": "https://source.unsplash.com/400x300/?pizza-lunch",
+    "product_desc": "Regular pizza with drink and dip.",
+    "product_prize": "10$"
+  }
+]
