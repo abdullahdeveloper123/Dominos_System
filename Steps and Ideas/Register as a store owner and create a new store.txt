@@ -1,0 +1,51 @@
+A store's admin pannel where store owner can controll everything related to their store.
+
+1. Owner can update, add, delete categories and subcategories
+2. owner can update,add,delete products on their store page.
+3. owner can update,add,delete banner images and slides on their page,
+
+--------------------------------------------Store owner user account Pannel--------------------------------------------
+
+1. name, email, number, password, store location, store name.
+
+|
+|
+|
+|
+
+2. Redirect to a Store admin page/pannel to create categories, subcategories, products, Banners that will show on his page/store page.
+
+|
+|
+|
+|
+
+3. His Page/Store will be live after added products and categores.
+
+
+
+
+--------------------------------------------Store owner user account Creation--------------------------------------------
+
+1. Seperate Seller account creation with endpoint /seller_account/register or /seller_account/login
+
+
+|
+|
+|
+|
+
+2. Land to Store owner pannel
+
+
+
+
+
+
+
+
+
+
+
+
+

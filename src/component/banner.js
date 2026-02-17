@@ -29,17 +29,17 @@ const Banner = () => {
         
         if (data.home_banner_1) {
           try {
-            loadedBanners.home_banner_1 = require(`../assets/img/${data.home_banner_1}.jpg`);
+            loadedBanners.home_banner_1 = require(`../assets/img/${data.home_banner_1}`);
           } catch (e) {
             console.error('Error loading banner 1:', e);
           }
         }
         if (data.home_banner_2) {
           try {
-            loadedBanners.home_banner_2 = require(`../assets/img/${data.home_banner_2}.jpeg`);
+            loadedBanners.home_banner_2 = require(`../assets/img/${data.home_banner_2}`);
           } catch (e) {
             try {
-              loadedBanners.home_banner_2 = require(`../assets/img/${data.home_banner_2}.jpg`);
+              loadedBanners.home_banner_2 = require(`../assets/img/${data.home_banner_2}`);
             } catch (e2) {
               console.error('Error loading banner 2:', e2);
             }
@@ -47,7 +47,7 @@ const Banner = () => {
         }
         if (data.home_banner_3) {
           try {
-            loadedBanners.home_banner_3 = require(`../assets/img/${data.home_banner_3}.jpg`);
+            loadedBanners.home_banner_3 = require(`../assets/img/${data.home_banner_3}`);
           } catch (e) {
             console.error('Error loading banner 3:', e);
           }
