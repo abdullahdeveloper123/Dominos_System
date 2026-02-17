@@ -5,6 +5,13 @@ import '../App.css';
 const SellingProductCard = ({ product, onEdit, onDelete }) => {
   return (
     <div className="selling-product-card">
+      {/* Hidden input to store product ID */}
+      <input 
+        type="hidden" 
+        value={product._id || product.id || ''} 
+        data-product-id={product._id || product.id || ''}
+      />
+      
       <div className="selling-product-image-container">
         <img 
           src={product.product_img || 'https://source.unsplash.com/400x300/?food'} 

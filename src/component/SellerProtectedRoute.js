@@ -23,11 +23,8 @@ const SellerProtectedRoute = ({ children, requiresHotel = true }) => {
       // Check if seller has a hotel
       try {
         const response = await fetch(`${process.env.REACT_APP_API_URL}/check_seller_hotel`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ seller_id: sellerId })
+          method: 'GET',
+          credentials: 'include' // Include cookies for session
         });
 
         const data = await response.json();
@@ -65,7 +62,7 @@ const SellerProtectedRoute = ({ children, requiresHotel = true }) => {
 
   // If not authenticated, redirect to register
   if (!isAuthenticated) {
-    return <Navigate to="/seller_account/register" replace />;
+    return <Navigate to="/seller_account/login" replace />;
   }
 
   // If on make-shop page, allow access (doesn't require hotel)

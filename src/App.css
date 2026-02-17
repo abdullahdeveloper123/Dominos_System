@@ -2683,3 +2683,219 @@ html {
     width: 100%;
   }
 }
+
+/* Edit Product Form Styles */
+.edit-product-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.edit-product-modal {
+  background-color: var(--white);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 700px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(-50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.edit-product-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 32px;
+  border-bottom: 1px solid var(--border-gray);
+}
+
+.edit-product-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin: 0;
+}
+
+.edit-product-close {
+  background: none;
+  border: none;
+  font-size: 32px;
+  color: var(--text-light);
+  cursor: pointer;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.3s;
+}
+
+.edit-product-close:hover {
+  background-color: var(--light-gray);
+  color: var(--text-dark);
+}
+
+.edit-product-form {
+  padding: 32px;
+}
+
+.edit-product-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.edit-product-form .form-group {
+  margin-bottom: 24px;
+}
+
+.edit-product-form .form-group label {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-light);
+}
+
+.edit-product-form input,
+.edit-product-form textarea,
+.edit-product-form select {
+  width: 100%;
+  padding: 14px 16px;
+  font-size: 14px;
+  border: none;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  box-sizing: border-box;
+  transition: all 0.3s;
+  color: var(--text-dark);
+}
+
+.edit-product-form input:focus,
+.edit-product-form textarea:focus,
+.edit-product-form select:focus {
+  outline: none;
+  background-color: #e9ecef;
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+}
+
+.edit-product-form textarea {
+  resize: vertical;
+  font-family: inherit;
+}
+
+.edit-product-form select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%23666666' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  padding-right: 40px;
+  cursor: pointer;
+}
+
+.edit-product-actions {
+  display: flex;
+  gap: 16px;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-gray);
+}
+
+.edit-product-cancel-btn {
+  flex: 1;
+  background-color: transparent;
+  color: var(--text-dark);
+  padding: 14px;
+  font-size: 16px;
+  font-weight: 600;
+  border: 2px solid var(--border-gray);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.edit-product-cancel-btn:hover {
+  background-color: var(--light-gray);
+  border-color: var(--text-dark);
+}
+
+.edit-product-submit-btn {
+  flex: 1;
+  background-color: var(--primary-blue);
+  color: var(--white);
+  padding: 14px;
+  font-size: 16px;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.edit-product-submit-btn:hover:not(:disabled) {
+  background-color: var(--hover-blue);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 102, 204, 0.3);
+}
+
+.edit-product-submit-btn:disabled {
+  background-color: var(--text-light);
+  cursor: not-allowed;
+  transform: none;
+}
+
+.edit-product-error {
+  background-color: #fee;
+  color: #c33;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  font-size: 13px;
+  border-left: 4px solid #c33;
+}
+
+@media (max-width: 768px) {
+  .edit-product-modal {
+    max-width: 95%;
+  }
+
+  .edit-product-header {
+    padding: 20px 24px;
+  }
+
+  .edit-product-form {
+    padding: 24px;
+  }
+
+  .edit-product-row {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .edit-product-actions {
+    flex-direction: column;
+  }
+}

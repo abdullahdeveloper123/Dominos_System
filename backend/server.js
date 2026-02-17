@@ -1,6 +1,7 @@
 const express = require('express');
 const { MongoClient } = require('mongodb');
 const cors = require('cors');
+const session = require('express-session');
 const bcrypt = require('bcrypt');
 const app = express();
 const PORT = 8000;
@@ -8,12 +9,29 @@ const PORT = 8000;
 // Middleware to parse JSON bodies
 app.use(express.json());
 
+// CORS middleware - must be before session
+app.use(cors({
+  origin: true, // Allow any origin in development (change to specific URL in production)
+  credentials: true // Allow cookies to be sent
+}));
+
+// Session middleware
+app.use(session({
+  secret: 'your-secret-key-change-in-production', // Change this in production
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: false, // Set to true if using HTTPS in production
+    httpOnly: true,
+    maxAge: 1000 * 60 * 60 * 24 * 7 // 7 days
+  }
+}));
+
 // Middleware to log requests
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
   next();
-});
-app.use(cors()); 
+}); 
 
 // MongoDB connection URL
 const MONGO_URL = 'mongodb://localhost:27017';
@@ -69,10 +87,21 @@ app.post('/seller_account/register', async (req, res) => {
     
     const result = await db.collection('sellers').insertOne(seller);
     
+    // Create session after registration
+    req.session.sellerId = result.insertedId;
+    req.session.sellerEmail = email;
+    req.session.sellerName = name;
+    
     res.status(201).json({
       success: true,
       message: 'Seller registered successfully',
-      sellerId: result.insertedId
+      seller: {
+        id: result.insertedId,
+        name: name,
+        email: email,
+        phone: phone,
+        address: address
+      }
     });
   } catch (err) {
     console.error('Error registering seller:', err);
@@ -114,6 +143,11 @@ app.post('/seller_account/login', async (req, res) => {
       });
     }
     
+    // Create session
+    req.session.sellerId = seller._id;
+    req.session.sellerEmail = seller.email;
+    req.session.sellerName = seller.name;
+    
     res.json({
       success: true,
       message: 'Login successful',
@@ -134,33 +168,58 @@ app.post('/seller_account/login', async (req, res) => {
   }
 });
 
+// Seller logout route
+app.get('/seller_account/logout', (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to logout'
+      });
+    }
+    res.json({
+      success: true,
+      message: 'Logout successful'
+    });
+  });
+});
+
 // Make shop route - add hotel to city
 app.post('/make_shop', async (req, res) => {
   try {
-    const { city_name, hotel_name, seller_id } = req.body;
+    const { city_name, hotel_name } = req.body;
     
     // Validate required fields
-    if (!city_name || !hotel_name || !seller_id) {
+    if (!city_name || !hotel_name) {
       return res.status(400).json({
         success: false,
-        error: 'city_name, hotel_name, and seller_id are required'
+        error: 'city_name and hotel_name are required'
       });
     }
     
-    // Convert string to ObjectId if needed
+    // Check if user is logged in
+    if (!req.session.sellerId) {
+      return res.status(401).json({
+        success: false,
+        error: 'You must be logged in to create a shop'
+      });
+    }
+    
+    // Convert string to ObjectId
     const { ObjectId } = require('mongodb');
     let sellerId;
     try {
-      sellerId = new ObjectId(seller_id);
+      sellerId = new ObjectId(req.session.sellerId);
     } catch (err) {
       return res.status(400).json({
         success: false,
-        error: 'Invalid seller_id format'
+        error: 'Invalid session data'
       });
     }
     
     // Get seller information
     const seller = await db.collection('sellers').findOne({ _id: sellerId });
+    
     if (!seller) {
       return res.status(404).json({
         success: false,
@@ -248,35 +307,26 @@ app.post('/make_shop', async (req, res) => {
     console.error('Error creating shop:', err);
     res.status(500).json({
       success: false,
-      error: 'Failed to create shop'
+      error: 'Failed to create shop',
+      details: err.message
     });
   }
 });
 
 // Check if seller has a hotel
-app.post('/check_seller_hotel', async (req, res) => {
+app.get('/check_seller_hotel', async (req, res) => {
   try {
-    const { seller_id } = req.body;
-    
-    // Validate required field
-    if (!seller_id) {
-      return res.status(400).json({
+    // Check if user is logged in
+    if (!req.session.sellerId) {
+      return res.status(401).json({
         success: false,
-        error: 'seller_id is required'
+        error: 'You must be logged in'
       });
     }
     
-    // Convert string to ObjectId if needed
+    // Convert string to ObjectId
     const { ObjectId } = require('mongodb');
-    let sellerId;
-    try {
-      sellerId = new ObjectId(seller_id);
-    } catch (err) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid seller_id format'
-      });
-    }
+    const sellerId = new ObjectId(req.session.sellerId);
     
     // Find hotel by seller_id
     const hotel = await db.collection('hotels').findOne({ seller_id: sellerId });
@@ -307,7 +357,6 @@ app.post('/check_seller_hotel', async (req, res) => {
 app.post('/add_product', async (req, res) => {
   try {
     const { 
-      seller_id,
       category, 
       subcategory, 
       product_name, 
@@ -316,26 +365,26 @@ app.post('/add_product', async (req, res) => {
       product_prize 
     } = req.body;
     
-    // Validate required fields
-    if (!seller_id || !category || !subcategory || 
-        !product_name || !product_img || !product_desc || !product_prize) {
-      return res.status(400).json({
+    // Check if user is logged in
+    if (!req.session.sellerId) {
+      return res.status(401).json({
         success: false,
-        error: 'All fields are required: seller_id, category, subcategory, product_name, product_img, product_desc, product_prize'
+        error: 'You must be logged in to add a product'
       });
     }
     
-    // Convert string to ObjectId if needed
-    const { ObjectId } = require('mongodb');
-    let sellerId;
-    try {
-      sellerId = new ObjectId(seller_id);
-    } catch (err) {
+    // Validate required fields
+    if (!category || !subcategory || 
+        !product_name || !product_img || !product_desc || !product_prize) {
       return res.status(400).json({
         success: false,
-        error: 'Invalid seller_id format'
+        error: 'All fields are required: category, subcategory, product_name, product_img, product_desc, product_prize'
       });
     }
+    
+    // Convert string to ObjectId
+    const { ObjectId } = require('mongodb');
+    const sellerId = new ObjectId(req.session.sellerId);
     
     // Fetch hotel information from hotels collection
     const hotel = await db.collection('hotels').findOne({ seller_id: sellerId });
@@ -418,29 +467,19 @@ app.post('/add_product', async (req, res) => {
 });
 
 // Check if seller has products
-app.post('/check_seller_products', async (req, res) => {
+app.get('/check_seller_products', async (req, res) => {
   try {
-    const { seller_id } = req.body;
-    
-    // Validate required field
-    if (!seller_id) {
-      return res.status(400).json({
+    // Check if user is logged in
+    if (!req.session.sellerId) {
+      return res.status(401).json({
         success: false,
-        error: 'seller_id is required'
+        error: 'You must be logged in'
       });
     }
     
-    // Convert string to ObjectId if needed
+    // Convert string to ObjectId
     const { ObjectId } = require('mongodb');
-    let sellerId;
-    try {
-      sellerId = new ObjectId(seller_id);
-    } catch (err) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid seller_id format'
-      });
-    }
+    const sellerId = new ObjectId(req.session.sellerId);
     
     // Check if seller has any products
     const product = await db.collection('products').findOne({ seller_id: sellerId });
@@ -466,29 +505,19 @@ app.post('/check_seller_products', async (req, res) => {
 });
 
 // Get seller products
-app.post('/get_seller_products', async (req, res) => {
+app.get('/get_seller_products', async (req, res) => {
   try {
-    const { seller_id } = req.body;
-    
-    // Validate required field
-    if (!seller_id) {
-      return res.status(400).json({
+    // Check if user is logged in
+    if (!req.session.sellerId) {
+      return res.status(401).json({
         success: false,
-        error: 'seller_id is required'
+        error: 'You must be logged in'
       });
     }
     
-    // Convert string to ObjectId if needed
+    // Convert string to ObjectId
     const { ObjectId } = require('mongodb');
-    let sellerId;
-    try {
-      sellerId = new ObjectId(seller_id);
-    } catch (err) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid seller_id format'
-      });
-    }
+    const sellerId = new ObjectId(req.session.sellerId);
     
     // Fetch all products for this seller
     const products = await db.collection('products')
@@ -504,6 +533,304 @@ app.post('/get_seller_products', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to fetch seller products'
+    });
+  }
+});
+
+// Get product details for editing
+app.get('/product_edit/:product_id', async (req, res) => {
+  try {
+    const { product_id } = req.params;
+    
+    // Check if user is logged in
+    if (!req.session.sellerId) {
+      return res.status(401).json({
+        success: false,
+        error: 'You must be logged in'
+      });
+    }
+    
+    // Convert string to ObjectId
+    const { ObjectId } = require('mongodb');
+    let productId;
+    try {
+      productId = new ObjectId(product_id);
+    } catch (err) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid product_id format'
+      });
+    }
+    
+    const sellerId = new ObjectId(req.session.sellerId);
+    
+    // Find product by id and verify it belongs to the logged-in seller
+    const product = await db.collection('products').findOne({ 
+      _id: productId,
+      seller_id: sellerId 
+    });
+    
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        error: 'Product not found or you do not have permission to edit it'
+      });
+    }
+    
+    res.json({
+      success: true,
+      product: product
+    });
+  } catch (err) {
+    console.error('Error fetching product:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch product'
+    });
+  }
+});
+
+// Update product
+app.post('/product_edit/:product_id', async (req, res) => {
+  try {
+    const { product_id } = req.params;
+    const { 
+      category, 
+      subcategory, 
+      product_name, 
+      product_img, 
+      product_desc, 
+      product_prize 
+    } = req.body;
+    
+    // Check if user is logged in
+    if (!req.session.sellerId) {
+      return res.status(401).json({
+        success: false,
+        error: 'You must be logged in'
+      });
+    }
+    
+    // Validate required fields
+    if (!category || !subcategory || 
+        !product_name || !product_img || !product_desc || !product_prize) {
+      return res.status(400).json({
+        success: false,
+        error: 'All fields are required: category, subcategory, product_name, product_img, product_desc, product_prize'
+      });
+    }
+    
+    // Convert string to ObjectId
+    const { ObjectId } = require('mongodb');
+    let productId;
+    try {
+      productId = new ObjectId(product_id);
+    } catch (err) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid product_id format'
+      });
+    }
+    
+    const sellerId = new ObjectId(req.session.sellerId);
+    
+    // Verify product belongs to the logged-in seller
+    const existingProduct = await db.collection('products').findOne({ 
+      _id: productId,
+      seller_id: sellerId 
+    });
+    
+    if (!existingProduct) {
+      return res.status(404).json({
+        success: false,
+        error: 'Product not found or you do not have permission to edit it'
+      });
+    }
+    
+    // Update product
+    const updateData = {
+      category,
+      subcategory,
+      product_name,
+      product_img,
+      product_desc,
+      product_prize,
+      updatedAt: new Date()
+    };
+    
+    const result = await db.collection('products').updateOne(
+      { _id: productId, seller_id: sellerId },
+      { $set: updateData }
+    );
+    
+    if (result.modifiedCount === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Failed to update product'
+      });
+    }
+    
+    // Fetch updated product
+    const updatedProduct = await db.collection('products').findOne({ _id: productId });
+    
+    res.json({
+      success: true,
+      message: 'Product updated successfully',
+      product: updatedProduct
+    });
+  } catch (err) {
+    console.error('Error updating product:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update product'
+    });
+  }
+});
+
+// Delete product
+app.delete('/product_delete/:product_id', async (req, res) => {
+  try {
+    const { product_id } = req.params;
+    
+    // Check if user is logged in
+    if (!req.session.sellerId) {
+      return res.status(401).json({
+        success: false,
+        error: 'You must be logged in'
+      });
+    }
+    
+    // Convert string to ObjectId
+    const { ObjectId } = require('mongodb');
+    let productId;
+    try {
+      productId = new ObjectId(product_id);
+    } catch (err) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid product_id format'
+      });
+    }
+    
+    const sellerId = new ObjectId(req.session.sellerId);
+    
+    // Verify product belongs to the logged-in seller before deleting
+    const existingProduct = await db.collection('products').findOne({ 
+      _id: productId,
+      seller_id: sellerId 
+    });
+    
+    if (!existingProduct) {
+      return res.status(404).json({
+        success: false,
+        error: 'Product not found or you do not have permission to delete it'
+      });
+    }
+    
+    // Delete product
+    const result = await db.collection('products').deleteOne({ 
+      _id: productId,
+      seller_id: sellerId 
+    });
+    
+    if (result.deletedCount === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Failed to delete product'
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Product deleted successfully',
+      deletedProductId: product_id
+    });
+  } catch (err) {
+    console.error('Error deleting product:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete product'
+    });
+  }
+});
+
+// Create new order
+app.post('/create_order', async (req, res) => {
+  try {
+    const { user_id, product_id, product_quantity, total_price, address, store_id } = req.body;
+    
+    // Validate required fields
+    if (!user_id || !product_id || !product_quantity || !total_price || !address || !store_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'All fields are required: user_id, product_id, product_quantity, total_price, address, store_id'
+      });
+    }
+    
+    // Convert strings to ObjectId
+    const { ObjectId } = require('mongodb');
+    let userId, productId, storeId;
+    try {
+      userId = new ObjectId(user_id);
+      productId = new ObjectId(product_id);
+      storeId = new ObjectId(store_id);
+    } catch (err) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid user_id, product_id, or store_id format'
+      });
+    }
+    
+    // Fetch product details
+    const product = await db.collection('products').findOne({ _id: productId });
+    
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        error: 'Product not found'
+      });
+    }
+    
+    // Fetch store details
+    const store = await db.collection('hotels').findOne({ _id: storeId });
+    
+    if (!store) {
+      return res.status(404).json({
+        success: false,
+        error: 'Store not found'
+      });
+    }
+    
+    // Create order document
+    const order = {
+      user_id: userId,
+      product_id: productId,
+      product_name: product.product_name,
+      product_img: product.product_img,
+      product_quantity: parseInt(product_quantity),
+      total_price: total_price,
+      delivery_address: address,
+      store_id: storeId,
+      seller_id: store.seller_id,
+      hotel_name: store.hotel_name,
+      city_name: store.city_name,
+      order_status: 'pending', // pending, confirmed, preparing, out_for_delivery, delivered, cancelled
+      createdAt: new Date()
+    };
+    
+    const result = await db.collection('orders').insertOne(order);
+    
+    res.status(201).json({
+      success: true,
+      message: 'Order created successfully',
+      orderId: result.insertedId,
+      order: order
+    });
+  } catch (err) {
+    console.error('Error creating order:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create order'
     });
   }
 });
@@ -602,7 +929,7 @@ app.post('/get_products', async (req, res) => {
     }
     
     const products = await db.collection('products')
-      .find({ city_name, hotel_name }, { projection: { _id: 0 } })
+      .find({ city_name, hotel_name })
       .toArray();
     
     res.json({

@@ -8,6 +8,7 @@ const ProductCard = ({ product }) => {
   };
 
   // Handle different possible field names from API
+  const productId = product._id || product.id || '';
   const productName = product.name || product.product_name || product.title || '';
   const productDesc = product.description || product.product_desc || product.desc || '';
   const productPrice = product.price || product.product_price || product.product_prize || 0;
@@ -16,6 +17,13 @@ const ProductCard = ({ product }) => {
 
   return (
     <div className="product-card">
+      {/* Hidden input to store product ID */}
+      <input 
+        type="hidden" 
+        value={productId} 
+        data-product-id={productId}
+      />
+      
       {/* Product Image */}
       <div className="product-image-container">
         <img 

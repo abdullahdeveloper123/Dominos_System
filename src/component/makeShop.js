@@ -32,19 +32,9 @@ const MakeShop = () => {
     setLoading(true);
 
     try {
-      // Get seller_id from localStorage
-      const sellerId = localStorage.getItem('sellerId');
-      
-      if (!sellerId) {
-        setError('Seller ID not found. Please register first.');
-        setLoading(false);
-        return;
-      }
-
       const payload = {
         city_name: formData.cityName,
-        hotel_name: formData.hotelName,
-        seller_id: sellerId
+        hotel_name: formData.hotelName
       };
 
       const response = await fetch(`${process.env.REACT_APP_API_URL}/make_shop`, {
@@ -52,6 +42,7 @@ const MakeShop = () => {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Include cookies for session
         body: JSON.stringify(payload)
       });
 
@@ -64,7 +55,7 @@ const MakeShop = () => {
         
         alert(data.message || 'Shop created successfully!');
         // Navigate to next step or dashboard
-        navigate('/seller-admin-panel');
+        navigate('/seller_account/');
       } else {
         setError(data.message || 'Failed to create shop. Please try again.');
       }

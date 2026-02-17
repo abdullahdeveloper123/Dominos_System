@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Home from './views/Home';
 import Deals from './views/deals';
 import SellerRegister from './views/sellerRegister';
+import SellerLogin from './views/sellerLogin';
 import SellerAdminPannel from './views/sellerAdminPannel';
 import MakeShop from './component/makeShop';
 import MakeProductForm from './component/makeProductForm';
@@ -16,7 +17,9 @@ function AppContent() {
         <Route path="/" element={<Home />} />
         <Route path="/deals" element={<Deals />} />
         <Route path="/seller-register" element={<SellerRegister />} />
+        <Route path="/seller-login" element={<SellerLogin />} />
         <Route path="/seller_account/register" element={<SellerRegister />} />
+        <Route path="/seller_account/login" element={<SellerLogin />} />
         
         {/* Protected seller routes */}
         <Route 

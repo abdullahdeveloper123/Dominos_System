@@ -14,19 +14,9 @@ const SellerAdminPannel = () => {
 
   const checkProducts = async () => {
     try {
-      const sellerId = localStorage.getItem('sellerId');
-      
-      if (!sellerId) {
-        setLoading(false);
-        return;
-      }
-
       const response = await fetch(`${process.env.REACT_APP_API_URL}/check_seller_products`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ seller_id: sellerId })
+        method: 'GET',
+        credentials: 'include' // Include cookies for session
       });
 
       const data = await response.json();

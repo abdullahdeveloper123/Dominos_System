@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SellingProductCard from './sellingProductCard';
+import EditProductForm from './editProductForm';
 import { FaPlus } from 'react-icons/fa';
 import '../App.css';
 
@@ -9,6 +10,7 @@ const SellingProducts = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [editingProduct, setEditingProduct] = useState(null);
 
   useEffect(() => {
     fetchProducts();
@@ -16,20 +18,9 @@ const SellingProducts = () => {
 
   const fetchProducts = async () => {
     try {
-      const sellerId = localStorage.getItem('sellerId');
-      
-      if (!sellerId) {
-        setError('Seller ID not found');
-        setLoading(false);
-        return;
-      }
-
       const response = await fetch(`${process.env.REACT_APP_API_URL}/get_seller_products`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ seller_id: sellerId })
+        method: 'GET',
+        credentials: 'include' // Include cookies for session
       });
 
       const data = await response.json();
@@ -48,9 +39,16 @@ const SellingProducts = () => {
   };
 
   const handleEdit = (product) => {
-    // TODO: Implement edit functionality
-    console.log('Edit product:', product);
-    alert('Edit functionality coming soon!');
+    setEditingProduct(product);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingProduct(null);
+  };
+
+  const handleUpdateProduct = () => {
+    setEditingProduct(null);
+    fetchProducts(); // Refresh the list
   };
 
   const handleDelete = async (product) => {
@@ -59,15 +57,11 @@ const SellingProducts = () => {
     }
 
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/delete_product`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          product_id: product._id || product.id,
-          seller_id: localStorage.getItem('sellerId')
-        })
+      const productId = product._id || product.id;
+      
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/product_delete/${productId}`, {
+        method: 'DELETE',
+        credentials: 'include' // Include cookies for session
       });
 
       const data = await response.json();
@@ -107,6 +101,14 @@ const SellingProducts = () => {
 
   return (
     <div className="selling-products-container">
+      {editingProduct && (
+        <EditProductForm
+          product={editingProduct}
+          onCancel={handleCancelEdit}
+          onUpdate={handleUpdateProduct}
+        />
+      )}
+
       <div className="selling-products-header">
         <h2 className="selling-products-title">My Products</h2>
         <button className="add-product-btn" onClick={handleAddProduct}>

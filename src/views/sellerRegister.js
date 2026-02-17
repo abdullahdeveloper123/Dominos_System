@@ -56,7 +56,7 @@ const SellerRegister = () => {
 
     try {
       const payload = {
-        name: formData.name,
+        name: `${formData.firstName} ${formData.lastName}`,
         email: formData.email,
         phone: formData.phone,
         address: formData.address,
@@ -68,22 +68,20 @@ const SellerRegister = () => {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Include cookies for session
         body: JSON.stringify(payload)
       });
 
       const data = await response.json();
 
       if (response.ok && data.success) {
-        localStorage.setItem('sellerId', data.sellerId);
+        localStorage.setItem('sellerId', data.seller.id);
         
         // Check if seller has a hotel
         try {
           const checkResponse = await fetch(`${process.env.REACT_APP_API_URL}/check_seller_hotel`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ seller_id: data.sellerId })
+            method: 'GET',
+            credentials: 'include' // Include cookies for session
           });
 
           const checkData = await checkResponse.json();
