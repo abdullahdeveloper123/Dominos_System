@@ -3,8 +3,47 @@ const { MongoClient } = require('mongodb');
 const cors = require('cors');
 const session = require('express-session');
 const bcrypt = require('bcrypt');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const app = express();
 const PORT = 8000;
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = path.join(__dirname, '../src/assets/uploads');
+    // Create directory if it doesn't exist
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    // Generate unique filename with timestamp
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit per file
+  },
+  fileFilter: function (req, file, cb) {
+    // Accept only image files
+    const allowedTypes = /jpeg|jpg|png|gif|webp/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed!'));
+    }
+  }
+});
 
 // Middleware to parse JSON bodies
 app.use(express.json());
@@ -689,6 +728,8 @@ app.post('/add_product', async (req, res) => {
       product_desc,
       product_prize,
       seller_id: sellerId,
+      total_ordered: 0, // Initialize order counter
+      last_ordered: null, // Track last order date
       createdAt: new Date()
     };
     
@@ -1077,6 +1118,15 @@ app.post('/create_order', async (req, res) => {
     
     const result = await db.collection('orders').insertOne(order);
     
+    // Update product's total_ordered count
+    await db.collection('products').updateOne(
+      { _id: productId },
+      { 
+        $inc: { total_ordered: 1 },
+        $set: { last_ordered: new Date() }
+      }
+    );
+    
     res.status(201).json({
       success: true,
       message: 'Order created successfully',
@@ -1199,6 +1249,387 @@ app.post('/get_products', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to fetch products'
+    });
+  }
+});
+
+// Upload images endpoint
+app.post('/seller_account/upload_images', (req, res) => {
+  // Use upload.any() to accept any field name
+  upload.any()(req, res, async function (err) {
+    try {
+      // Check if seller is logged in
+      if (!req.session.sellerId) {
+        return res.status(401).json({
+          success: false,
+          error: 'You must be logged in to upload images'
+        });
+      }
+      
+      if (err) {
+        console.error('Multer error:', err);
+        return res.status(400).json({
+          success: false,
+          error: err.message || 'Error uploading files'
+        });
+      }
+      
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'No files uploaded'
+        });
+      }
+      
+      // Limit to 5 files
+      if (req.files.length > 5) {
+        return res.status(400).json({
+          success: false,
+          error: 'Maximum 5 images allowed'
+        });
+      }
+      
+      // Get uploaded filenames
+      const uploadedFiles = req.files.map(file => file.filename);
+      
+      res.json({
+        success: true,
+        message: 'Images uploaded successfully',
+        uploadedFiles: uploadedFiles
+      });
+    } catch (err) {
+      console.error('Error uploading images:', err);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to upload images',
+        details: err.message
+      });
+    }
+  });
+});
+
+// Update seller banners
+app.post('/seller_account/update_banner', async (req, res) => {
+  try {
+    const { images_quantity, images_name } = req.body;
+    
+    // Check if seller is logged in
+    if (!req.session.sellerId) {
+      return res.status(401).json({
+        success: false,
+        error: 'You must be logged in to update banners'
+      });
+    }
+    
+    // Validate required fields
+    if (!images_quantity || !images_name || !Array.isArray(images_name)) {
+      return res.status(400).json({
+        success: false,
+        error: 'images_quantity and images_name (array) are required'
+      });
+    }
+    
+    // Validate images_quantity matches array length
+    if (parseInt(images_quantity) !== images_name.length) {
+      return res.status(400).json({
+        success: false,
+        error: 'images_quantity must match the number of images in images_name array'
+      });
+    }
+    
+    // Validate max 5 images
+    if (images_name.length > 5) {
+      return res.status(400).json({
+        success: false,
+        error: 'Maximum 5 images allowed'
+      });
+    }
+    
+    // Convert string to ObjectId
+    const { ObjectId } = require('mongodb');
+    const sellerId = new ObjectId(req.session.sellerId);
+    
+    // Get seller's hotel information
+    const hotel = await db.collection('hotels').findOne({ seller_id: sellerId });
+    
+    if (!hotel) {
+      return res.status(404).json({
+        success: false,
+        error: 'No hotel found for this seller'
+      });
+    }
+    
+    // Update or create banner document
+    const bannerData = {
+      seller_id: sellerId,
+      hotel_name: hotel.hotel_name,
+      city_name: hotel.city_name,
+      images_quantity: parseInt(images_quantity),
+      images_name: images_name,
+      updatedAt: new Date()
+    };
+    
+    const result = await db.collection('seller_banners').updateOne(
+      { seller_id: sellerId },
+      { 
+        $set: bannerData,
+        $setOnInsert: { createdAt: new Date() }
+      },
+      { upsert: true }
+    );
+    
+    res.json({
+      success: true,
+      message: 'Banners updated successfully',
+      banner: bannerData
+    });
+  } catch (err) {
+    console.error('Error updating banners:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update banners',
+      details: err.message
+    });
+  }
+});
+
+// Get seller banners
+app.get('/seller_account/get_banners', async (req, res) => {
+  try {
+    // Check if seller is logged in
+    if (!req.session.sellerId) {
+      return res.status(401).json({
+        success: false,
+        error: 'You must be logged in to view banners'
+      });
+    }
+    
+    // Convert string to ObjectId
+    const { ObjectId } = require('mongodb');
+    const sellerId = new ObjectId(req.session.sellerId);
+    
+    // Fetch seller's banners
+    const banners = await db.collection('seller_banners').findOne({ seller_id: sellerId });
+    
+    if (!banners) {
+      return res.json({
+        success: true,
+        banners: null,
+        message: 'No banners found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      banners: banners
+    });
+  } catch (err) {
+    console.error('Error fetching banners:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch banners'
+    });
+  }
+});
+
+// Get seller dashboard statistics
+app.get('/seller_account/stats', async (req, res) => {
+  try {
+    // Check if seller is logged in
+    if (!req.session.sellerId) {
+      return res.status(401).json({
+        success: false,
+        error: 'You must be logged in to view stats'
+      });
+    }
+    
+    // Convert string to ObjectId
+    const { ObjectId } = require('mongodb');
+    const sellerId = new ObjectId(req.session.sellerId);
+    
+    // Get seller information
+    const seller = await db.collection('sellers').findOne({ _id: sellerId });
+    if (!seller) {
+      return res.status(404).json({
+        success: false,
+        error: 'Seller not found'
+      });
+    }
+    
+    // Get hotel information
+    const hotel = await db.collection('hotels').findOne({ seller_id: sellerId });
+    
+    // Get all orders for this seller
+    const orders = await db.collection('orders')
+      .find({ seller_id: sellerId })
+      .toArray();
+    
+    // Calculate total earnings
+    let totalEarnings = 0;
+    orders.forEach(order => {
+      // Remove $ sign and convert to number
+      const price = parseFloat(order.total_price.toString().replace('$', ''));
+      if (!isNaN(price)) {
+        totalEarnings += price;
+      }
+    });
+    
+    // Count orders by status
+    const ordersByStatus = {
+      pending: 0,
+      confirmed: 0,
+      preparing: 0,
+      out_for_delivery: 0,
+      delivered: 0,
+      cancelled: 0
+    };
+    
+    orders.forEach(order => {
+      if (ordersByStatus.hasOwnProperty(order.order_status)) {
+        ordersByStatus[order.order_status]++;
+      }
+    });
+    
+    // Get top 4 products by total_ordered
+    const topProducts = await db.collection('products')
+      .find({ seller_id: sellerId })
+      .sort({ total_ordered: -1 })
+      .limit(4)
+      .toArray();
+    
+    // Get total number of products
+    const totalProducts = await db.collection('products')
+      .countDocuments({ seller_id: sellerId });
+    
+    // Calculate today's orders
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayOrders = orders.filter(order => {
+      const orderDate = new Date(order.createdAt);
+      return orderDate >= today;
+    }).length;
+    
+    // Calculate this week's orders
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const weekOrders = orders.filter(order => {
+      const orderDate = new Date(order.createdAt);
+      return orderDate >= weekAgo;
+    }).length;
+    
+    // Calculate this month's orders
+    const monthAgo = new Date();
+    monthAgo.setMonth(monthAgo.getMonth() - 1);
+    const monthOrders = orders.filter(order => {
+      const orderDate = new Date(order.createdAt);
+      return orderDate >= monthAgo;
+    }).length;
+    
+    // Calculate average order value
+    const averageOrderValue = orders.length > 0 ? (totalEarnings / orders.length).toFixed(2) : 0;
+    
+    // Get recent orders (last 5)
+    const recentOrders = await db.collection('orders')
+      .find({ seller_id: sellerId })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .toArray();
+    
+    res.json({
+      success: true,
+      stats: {
+        seller_info: {
+          name: seller.name,
+          email: seller.email,
+          phone: seller.phone,
+          address: seller.address
+        },
+        hotel_info: hotel ? {
+          hotel_name: hotel.hotel_name,
+          city_name: hotel.city_name
+        } : null,
+        earnings: {
+          total: `$${totalEarnings.toFixed(2)}`,
+          average_order_value: `$${averageOrderValue}`
+        },
+        orders: {
+          total: orders.length,
+          today: todayOrders,
+          this_week: weekOrders,
+          this_month: monthOrders,
+          by_status: ordersByStatus
+        },
+        products: {
+          total: totalProducts,
+          top_selling: topProducts.map(product => ({
+            id: product._id,
+            name: product.product_name,
+            image: product.product_img,
+            price: product.product_prize,
+            times_ordered: product.total_ordered || 0,
+            last_ordered: product.last_ordered,
+            category: product.category,
+            subcategory: product.subcategory
+          }))
+        },
+        recent_orders: recentOrders.map(order => ({
+          id: order._id,
+          product_name: order.product_name,
+          quantity: order.product_quantity,
+          total_price: order.total_price,
+          status: order.order_status,
+          created_at: order.createdAt
+        }))
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching seller stats:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch seller stats',
+      details: err.message
+    });
+  }
+});
+
+// Get banners by city and hotel name
+app.post('/get_banners_by_location', async (req, res) => {
+  try {
+    const { city_name, hotel_name } = req.body;
+    
+    // Validate required fields
+    if (!city_name || !hotel_name) {
+      return res.status(400).json({
+        success: false,
+        error: 'city_name and hotel_name are required'
+      });
+    }
+    
+    // Fetch banners by city and hotel name
+    const banners = await db.collection('seller_banners').findOne({ 
+      city_name: city_name,
+      hotel_name: hotel_name
+    });
+    
+    if (!banners) {
+      return res.json({
+        success: true,
+        images_name: [],
+        images_quantity: 0,
+        message: 'No banners found for this location'
+      });
+    }
+    
+    res.json({
+      success: true,
+      images_name: banners.images_name,
+      images_quantity: banners.images_quantity
+    });
+  } catch (err) {
+    console.error('Error fetching banners by location:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch banners'
     });
   }
 });

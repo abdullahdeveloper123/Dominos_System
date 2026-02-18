@@ -10,7 +10,7 @@ const StorePannelSidebar = () => {
     { name: 'Products', path: '/seller_account/products' },
     { name: 'Orders', path: '/seller_account/orders' },
     { name: 'Order History', path: '/seller_account/order-history' },
-    { name: 'Banners', path: '#' },
+    { name: 'Banners', path: '/seller_account/banners' },
     { name: 'Edit profile', path: '/seller_account/edit-profile' },
   ];
 

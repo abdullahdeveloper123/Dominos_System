@@ -6,6 +6,8 @@ import SellingProducts from '../component/sellingProducts';
 import OrdersList from '../component/ordersList';
 import OrderHistory from '../component/orderHistory';
 import EditSellerProfile from '../component/editSellerProfile';
+import UploadBanners from '../component/uploadBanners';
+import SellerDashboard from '../component/sellerDashboard';
 import { FaBars, FaTimes } from 'react-icons/fa';
 import '../App.css';
 
@@ -71,17 +73,18 @@ const SellerAdminPannel = () => {
       return <EditSellerProfile />;
     }
 
-    // Default content - show product form if no products, otherwise dashboard
+    // Check if we're on the banners route
+    if (location.pathname.includes('/banners')) {
+      return <UploadBanners />;
+    }
+
+    // Default content - show product form if no products, otherwise show dashboard
     if (!hasProducts) {
       return <MakeProductForm onProductCreated={handleProductCreated} />;
     }
 
-    return (
-      <div className="admin-dashboard">
-        <h2>Welcome to your Admin Panel</h2>
-        <p>Your products are ready!</p>
-      </div>
-    );
+    // Show dashboard on home page
+    return <SellerDashboard />;
   };
 
   if (loading) {

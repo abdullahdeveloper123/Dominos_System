@@ -1,4 +1,7 @@
 import { useState, useEffect } from 'react';
+import carousel1 from '../assets/img/carousel_1.jpg';
+import carousel2 from '../assets/img/carousel_2.jpeg';
+import carousel3 from '../assets/img/carousel_3.jpg';
 
 const DealsCarousel = () => {
   const [images, setImages] = useState([]);
@@ -6,56 +9,100 @@ const DealsCarousel = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Default carousel images
+  const defaultImages = [carousel1, carousel2, carousel3];
+
   useEffect(() => {
     const fetchCarouselImages = async () => {
       try {
         setLoading(true);
         setError(null);
 
+        // Get location data from orderLocation in localStorage
+        const orderLocationStr = localStorage.getItem('orderLocation');
+        
+        console.log('OrderLocation from localStorage:', orderLocationStr);
+
+        let cityName = null;
+        let hotelName = null;
+
+        if (orderLocationStr) {
+          try {
+            const orderLocation = JSON.parse(orderLocationStr);
+            cityName = orderLocation.selectedCity;
+            hotelName = orderLocation.selectedStore;
+            console.log('Parsed location:', { cityName, hotelName });
+          } catch (parseErr) {
+            console.error('Error parsing orderLocation:', parseErr);
+          }
+        }
+
+        // If no location data, use default images
+        if (!cityName || !hotelName) {
+          console.log('No location data found in orderLocation, using default images');
+          setImages(defaultImages);
+          setLoading(false);
+          return;
+        }
+
         const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-        const response = await fetch(`${apiUrl}/deals_carousel`);
+        const payload = {
+          city_name: cityName,
+          hotel_name: hotelName
+        };
+
+        console.log('Making POST request to:', `${apiUrl}/get_banners_by_location`);
+        console.log('Payload:', payload);
+
+        const response = await fetch(`${apiUrl}/get_banners_by_location`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify(payload)
+        });
+
+        console.log('Response status:', response.status);
 
         if (!response.ok) {
-          throw new Error('Failed to fetch carousel images');
+          throw new Error('Failed to fetch banners');
         }
 
         const data = await response.json();
-        console.log('Carousel API Response:', data);
+        console.log('Banners API Response:', data);
 
-        if (Array.isArray(data) && data.length > 0) {
-          // Import images from local assets folder
-          const imageUrls = data.map(filename => {
+        if (data.success && data.images_quantity > 0 && data.images_name.length > 0) {
+          // Build image URLs from uploaded banners in src/assets/uploads/
+          const imageUrls = data.images_name.map(filename => {
             try {
-              // Try to require the image
-              return require(`../assets/img/${filename}`);
+              // Try to require the image from assets/uploads folder
+              return require(`../assets/uploads/${filename}`);
             } catch (err) {
-              // If exact filename fails, try common variations
-              const nameWithoutExt = filename.replace(/\.[^/.]+$/, '');
-              const extensions = ['.jpg', '.jpeg', '.png', '.webp'];
-              
-              for (const ext of extensions) {
-                try {
-                  return require(`../assets/img/${nameWithoutExt}${ext}`);
-                } catch (e) {
-                  // Continue to next extension
-                }
-              }
-              
-              console.error(`Failed to load image: ${filename}`);
+              console.error(`Failed to load uploaded image: ${filename}`, err);
               return null;
             }
           }).filter(url => url !== null);
           
-          console.log('Loaded images:', imageUrls.length, 'out of', data.length);
-          setImages(imageUrls);
+          if (imageUrls.length > 0) {
+            console.log('Loaded custom banners:', imageUrls);
+            setImages(imageUrls);
+          } else {
+            console.log('Failed to load custom banners, using default images');
+            setImages(defaultImages);
+          }
         } else {
-          setImages([]);
+          // No custom banners found, use default images
+          console.log('No custom banners found, using default images');
+          setImages(defaultImages);
         }
 
         setLoading(false);
       } catch (err) {
         console.error('Error fetching carousel images:', err);
         setError(err.message);
+        // On error, use default images
+        setImages(defaultImages);
         setLoading(false);
       }
     };
