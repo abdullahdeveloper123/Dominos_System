@@ -1041,98 +1041,213 @@ app.delete('/product_delete/:product_id', async (req, res) => {
 // Create new order
 app.post('/create_order', async (req, res) => {
   try {
-    const { user_id, product_id, product_quantity, total_price, address, store_id } = req.body;
+    const { user_id, product_id, product_quantity, total_price, address, store_id, products } = req.body;
     
-    // Validate required fields
-    if (!user_id || !product_id || !product_quantity || !total_price || !address || !store_id) {
-      return res.status(400).json({
-        success: false,
-        error: 'All fields are required: user_id, product_id, product_quantity, total_price, address, store_id'
-      });
-    }
-    
-    // Convert strings to ObjectId
+    // Convert string to ObjectId
     const { ObjectId } = require('mongodb');
-    let userId, productId, storeId;
-    try {
-      userId = new ObjectId(user_id);
-      productId = new ObjectId(product_id);
-      storeId = new ObjectId(store_id);
-    } catch (err) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid user_id, product_id, or store_id format',
-        details: err.message
-      });
-    }
     
-    // Fetch product details
-    const product = await db.collection('products').findOne({ _id: productId });
-    
-    if (!product) {
-      return res.status(404).json({
-        success: false,
-        error: 'Product not found'
-      });
-    }
-    
-    // Fetch store details - try by _id first, then by hotel_name and city_name from product
-    let store = await db.collection('hotels').findOne({ _id: storeId });
-    
-    if (!store) {
-      // If not found by _id, try finding by hotel_name and city_name from the product
-      store = await db.collection('hotels').findOne({ 
-        hotel_name: product.hotel_name,
-        city_name: product.city_name
-      });
-    }
-    
-    if (!store) {
-      return res.status(404).json({
-        success: false,
-        error: 'Store not found',
-        debug: {
-          store_id: store_id,
-          product_hotel: product.hotel_name,
-          product_city: product.city_name
-        }
-      });
-    }
-    
-    // Create order document
-    const order = {
-      user_id: userId,
-      product_id: productId,
-      product_name: product.product_name,
-      product_img: product.product_img,
-      product_quantity: parseInt(product_quantity),
-      total_price: total_price,
-      delivery_address: address,
-      store_id: store._id,
-      seller_id: store.seller_id,
-      hotel_name: store.hotel_name,
-      city_name: store.city_name,
-      order_status: 'pending', // pending, confirmed, preparing, out_for_delivery, delivered, cancelled
-      createdAt: new Date()
-    };
-    
-    const result = await db.collection('orders').insertOne(order);
-    
-    // Update product's total_ordered count
-    await db.collection('products').updateOne(
-      { _id: productId },
-      { 
-        $inc: { total_ordered: 1 },
-        $set: { last_ordered: new Date() }
+    // Check if this is a multi-product order or single product order
+    if (products && Array.isArray(products) && products.length > 0) {
+      // Multi-product order - create separate order for each product
+      if (!user_id || !address || !store_id) {
+        return res.status(400).json({
+          success: false,
+          error: 'user_id, address, and store_id are required for multi-product orders'
+        });
       }
-    );
-    
-    res.status(201).json({
-      success: true,
-      message: 'Order created successfully',
-      orderId: result.insertedId,
-      order: order
-    });
+      
+      let userId, storeId;
+      try {
+        userId = new ObjectId(user_id);
+        storeId = new ObjectId(store_id);
+      } catch (err) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid user_id or store_id format',
+          details: err.message
+        });
+      }
+      
+      // Fetch store details
+      let store = await db.collection('hotels').findOne({ _id: storeId });
+      
+      if (!store) {
+        // Try finding by first product's hotel and city
+        const firstProductId = new ObjectId(products[0].product_id);
+        const firstProduct = await db.collection('products').findOne({ _id: firstProductId });
+        
+        if (firstProduct) {
+          store = await db.collection('hotels').findOne({ 
+            hotel_name: firstProduct.hotel_name,
+            city_name: firstProduct.city_name
+          });
+        }
+      }
+      
+      if (!store) {
+        return res.status(404).json({
+          success: false,
+          error: 'Store not found'
+        });
+      }
+      
+      // Create separate order for each product
+      const createdOrders = [];
+      
+      for (const item of products) {
+        if (!item.product_id || !item.quantity) {
+          return res.status(400).json({
+            success: false,
+            error: 'Each product must have product_id and quantity'
+          });
+        }
+        
+        const productId = new ObjectId(item.product_id);
+        const product = await db.collection('products').findOne({ _id: productId });
+        
+        if (!product) {
+          return res.status(404).json({
+            success: false,
+            error: `Product not found: ${item.product_id}`
+          });
+        }
+        
+        // Calculate item price
+        const price = parseFloat(product.product_prize.toString().replace('$', ''));
+        const itemTotal = price * parseInt(item.quantity);
+        
+        // Create individual order for this product
+        const order = {
+          user_id: userId,
+          product_id: productId,
+          product_name: product.product_name,
+          product_img: product.product_img,
+          product_quantity: parseInt(item.quantity),
+          total_price: `$${itemTotal.toFixed(2)}`,
+          delivery_address: address,
+          store_id: store._id,
+          seller_id: store.seller_id,
+          hotel_name: store.hotel_name,
+          city_name: store.city_name,
+          order_status: 'pending',
+          createdAt: new Date()
+        };
+        
+        const result = await db.collection('orders').insertOne(order);
+        
+        // Update product's total_ordered count
+        await db.collection('products').updateOne(
+          { _id: productId },
+          { 
+            $inc: { total_ordered: 1 },
+            $set: { last_ordered: new Date() }
+          }
+        );
+        
+        createdOrders.push({
+          orderId: result.insertedId,
+          product_name: product.product_name,
+          quantity: parseInt(item.quantity),
+          total_price: `$${itemTotal.toFixed(2)}`
+        });
+      }
+      
+      res.status(201).json({
+        success: true,
+        message: `${createdOrders.length} orders created successfully`,
+        orders: createdOrders,
+        total_orders: createdOrders.length
+      });
+      
+    } else {
+      // Single product order (original logic)
+      if (!user_id || !product_id || !product_quantity || !total_price || !address || !store_id) {
+        return res.status(400).json({
+          success: false,
+          error: 'All fields are required: user_id, product_id, product_quantity, total_price, address, store_id'
+        });
+      }
+      
+      let userId, productId, storeId;
+      try {
+        userId = new ObjectId(user_id);
+        productId = new ObjectId(product_id);
+        storeId = new ObjectId(store_id);
+      } catch (err) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid user_id, product_id, or store_id format',
+          details: err.message
+        });
+      }
+      
+      // Fetch product details
+      const product = await db.collection('products').findOne({ _id: productId });
+      
+      if (!product) {
+        return res.status(404).json({
+          success: false,
+          error: 'Product not found'
+        });
+      }
+      
+      // Fetch store details
+      let store = await db.collection('hotels').findOne({ _id: storeId });
+      
+      if (!store) {
+        store = await db.collection('hotels').findOne({ 
+          hotel_name: product.hotel_name,
+          city_name: product.city_name
+        });
+      }
+      
+      if (!store) {
+        return res.status(404).json({
+          success: false,
+          error: 'Store not found',
+          debug: {
+            store_id: store_id,
+            product_hotel: product.hotel_name,
+            product_city: product.city_name
+          }
+        });
+      }
+      
+      // Create single product order document
+      const order = {
+        user_id: userId,
+        product_id: productId,
+        product_name: product.product_name,
+        product_img: product.product_img,
+        product_quantity: parseInt(product_quantity),
+        total_price: total_price,
+        delivery_address: address,
+        store_id: store._id,
+        seller_id: store.seller_id,
+        hotel_name: store.hotel_name,
+        city_name: store.city_name,
+        order_status: 'pending',
+        createdAt: new Date()
+      };
+      
+      const result = await db.collection('orders').insertOne(order);
+      
+      // Update product's total_ordered count
+      await db.collection('products').updateOne(
+        { _id: productId },
+        { 
+          $inc: { total_ordered: 1 },
+          $set: { last_ordered: new Date() }
+        }
+      );
+      
+      res.status(201).json({
+        success: true,
+        message: 'Order created successfully',
+        orderId: result.insertedId,
+        order: order
+      });
+    }
   } catch (err) {
     console.error('Error creating order:', err);
     res.status(500).json({
@@ -1605,10 +1720,10 @@ app.post('/get_banners_by_location', async (req, res) => {
       });
     }
     
-    // Fetch banners by city and hotel name
+    // Fetch banners by city and hotel name (case-insensitive)
     const banners = await db.collection('seller_banners').findOne({ 
-      city_name: city_name,
-      hotel_name: hotel_name
+      city_name: { $regex: new RegExp(`^${city_name}$`, 'i') },
+      hotel_name: { $regex: new RegExp(`^${hotel_name}$`, 'i') }
     });
     
     if (!banners) {
@@ -1630,6 +1745,507 @@ app.post('/get_banners_by_location', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to fetch banners'
+    });
+  }
+});
+
+// Add product to user cart
+app.post('/user/add_to_cart', async (req, res) => {
+  try {
+    const { product_id, quantity, user_id } = req.body;
+    
+    // Check if user_id is provided in body or session
+    let userId;
+    if (user_id) {
+      // User ID provided in body (like create_order)
+      const { ObjectId } = require('mongodb');
+      try {
+        userId = new ObjectId(user_id);
+      } catch (err) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid user_id format'
+        });
+      }
+    } else if (req.session.userId) {
+      // User ID from session
+      const { ObjectId } = require('mongodb');
+      userId = new ObjectId(req.session.userId);
+    } else {
+      return res.status(401).json({
+        success: false,
+        error: 'You must be logged in or provide user_id to add items to cart'
+      });
+    }
+    
+    // Validate required fields
+    if (!product_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'product_id is required'
+      });
+    }
+    
+    // Convert product_id to ObjectId
+    const { ObjectId } = require('mongodb');
+    let productId;
+    try {
+      productId = new ObjectId(product_id);
+    } catch (err) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid product_id format'
+      });
+    }
+    
+    // Fetch product details
+    const product = await db.collection('products').findOne({ _id: productId });
+    
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        error: 'Product not found'
+      });
+    }
+    
+    // Set quantity (default to 1 if not provided)
+    const itemQuantity = quantity ? parseInt(quantity) : 1;
+    
+    // Check if user already has a cart
+    const existingCart = await db.collection('carts').findOne({ user_id: userId });
+    
+    if (existingCart) {
+      // Check if product already exists in cart
+      const productIndex = existingCart.items.findIndex(
+        item => item.product_id.toString() === productId.toString()
+      );
+      
+      if (productIndex > -1) {
+        // Product exists, update quantity
+        await db.collection('carts').updateOne(
+          { user_id: userId, 'items.product_id': productId },
+          { 
+            $inc: { 'items.$.quantity': itemQuantity },
+            $set: { updatedAt: new Date() }
+          }
+        );
+      } else {
+        // Product doesn't exist, add new item
+        const newItem = {
+          product_id: productId,
+          product_name: product.product_name,
+          product_img: product.product_img,
+          product_prize: product.product_prize,
+          product_desc: product.product_desc,
+          category: product.category,
+          subcategory: product.subcategory,
+          city_name: product.city_name,
+          hotel_name: product.hotel_name,
+          seller_id: product.seller_id,
+          quantity: itemQuantity,
+          added_at: new Date()
+        };
+        
+        await db.collection('carts').updateOne(
+          { user_id: userId },
+          { 
+            $push: { items: newItem },
+            $set: { updatedAt: new Date() }
+          }
+        );
+      }
+    } else {
+      // Create new cart
+      const newCart = {
+        user_id: userId,
+        items: [{
+          product_id: productId,
+          product_name: product.product_name,
+          product_img: product.product_img,
+          product_prize: product.product_prize,
+          product_desc: product.product_desc,
+          category: product.category,
+          subcategory: product.subcategory,
+          city_name: product.city_name,
+          hotel_name: product.hotel_name,
+          seller_id: product.seller_id,
+          quantity: itemQuantity,
+          added_at: new Date()
+        }],
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      
+      await db.collection('carts').insertOne(newCart);
+    }
+    
+    // Fetch updated cart
+    const updatedCart = await db.collection('carts').findOne({ user_id: userId });
+    
+    res.json({
+      success: true,
+      message: 'Product added to cart successfully',
+      cart: updatedCart
+    });
+  } catch (err) {
+    console.error('Error adding to cart:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to add product to cart',
+      details: err.message
+    });
+  }
+});
+
+// Get user cart
+app.post('/user/get_cart', async (req, res) => {
+  try {
+    const { user_id } = req.body;
+    
+    // Check if user_id is provided in body or session
+    let userId;
+    if (user_id) {
+      // User ID provided in body
+      const { ObjectId } = require('mongodb');
+      try {
+        userId = new ObjectId(user_id);
+      } catch (err) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid user_id format'
+        });
+      }
+    } else if (req.session.userId) {
+      // User ID from session
+      const { ObjectId } = require('mongodb');
+      userId = new ObjectId(req.session.userId);
+    } else {
+      return res.status(401).json({
+        success: false,
+        error: 'You must be logged in or provide user_id to view cart'
+      });
+    }
+    
+    // Fetch user's cart
+    const cart = await db.collection('carts').findOne({ user_id: userId });
+    
+    if (!cart || !cart.items || cart.items.length === 0) {
+      return res.json({
+        success: true,
+        cart: {
+          items: [],
+          total_items: 0,
+          total_price: 0
+        },
+        message: 'Cart is empty'
+      });
+    }
+    
+    // Calculate total price
+    let totalPrice = 0;
+    cart.items.forEach(item => {
+      const price = parseFloat(item.product_prize.toString().replace('$', ''));
+      if (!isNaN(price)) {
+        totalPrice += price * item.quantity;
+      }
+    });
+    
+    res.json({
+      success: true,
+      cart: {
+        items: cart.items,
+        total_items: cart.items.length,
+        total_price: `$${totalPrice.toFixed(2)}`,
+        created_at: cart.createdAt,
+        updated_at: cart.updatedAt
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching cart:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch cart',
+      details: err.message
+    });
+  }
+});
+
+// Remove item from cart
+app.post('/user/remove_from_cart', async (req, res) => {
+  try {
+    const { user_id, product_id } = req.body;
+    
+    // Check if user_id is provided in body or session
+    let userId;
+    if (user_id) {
+      // User ID provided in body
+      const { ObjectId } = require('mongodb');
+      try {
+        userId = new ObjectId(user_id);
+      } catch (err) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid user_id format'
+        });
+      }
+    } else if (req.session.userId) {
+      // User ID from session
+      const { ObjectId } = require('mongodb');
+      userId = new ObjectId(req.session.userId);
+    } else {
+      return res.status(401).json({
+        success: false,
+        error: 'You must be logged in or provide user_id to remove items from cart'
+      });
+    }
+    
+    // Validate required fields
+    if (!product_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'product_id is required'
+      });
+    }
+    
+    // Convert product_id to ObjectId
+    const { ObjectId } = require('mongodb');
+    let productId;
+    try {
+      productId = new ObjectId(product_id);
+    } catch (err) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid product_id format'
+      });
+    }
+    
+    // Remove item from cart
+    const result = await db.collection('carts').updateOne(
+      { user_id: userId },
+      { 
+        $pull: { items: { product_id: productId } },
+        $set: { updatedAt: new Date() }
+      }
+    );
+    
+    if (result.modifiedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Item not found in cart or cart does not exist'
+      });
+    }
+    
+    // Fetch updated cart
+    const updatedCart = await db.collection('carts').findOne({ user_id: userId });
+    
+    // Calculate total price
+    let totalPrice = 0;
+    if (updatedCart && updatedCart.items) {
+      updatedCart.items.forEach(item => {
+        const price = parseFloat(item.product_prize.toString().replace('$', ''));
+        if (!isNaN(price)) {
+          totalPrice += price * item.quantity;
+        }
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Item removed from cart successfully',
+      cart: {
+        items: updatedCart?.items || [],
+        total_items: updatedCart?.items?.length || 0,
+        total_price: `$${totalPrice.toFixed(2)}`
+      }
+    });
+  } catch (err) {
+    console.error('Error removing from cart:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to remove item from cart',
+      details: err.message
+    });
+  }
+});
+
+// Update cart item quantity
+app.post('/user/update_cart', async (req, res) => {
+  try {
+    const { user_id, product_id, quantity } = req.body;
+    
+    // Check if user_id is provided in body or session
+    let userId;
+    if (user_id) {
+      // User ID provided in body
+      const { ObjectId } = require('mongodb');
+      try {
+        userId = new ObjectId(user_id);
+      } catch (err) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid user_id format'
+        });
+      }
+    } else if (req.session.userId) {
+      // User ID from session
+      const { ObjectId } = require('mongodb');
+      userId = new ObjectId(req.session.userId);
+    } else {
+      return res.status(401).json({
+        success: false,
+        error: 'You must be logged in or provide user_id to update cart'
+      });
+    }
+    
+    // Validate required fields
+    if (!product_id || !quantity) {
+      return res.status(400).json({
+        success: false,
+        error: 'product_id and quantity are required'
+      });
+    }
+    
+    // Validate quantity
+    const newQuantity = parseInt(quantity);
+    if (isNaN(newQuantity) || newQuantity < 1) {
+      return res.status(400).json({
+        success: false,
+        error: 'Quantity must be a positive number'
+      });
+    }
+    
+    // Convert product_id to ObjectId
+    const { ObjectId } = require('mongodb');
+    let productId;
+    try {
+      productId = new ObjectId(product_id);
+    } catch (err) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid product_id format'
+      });
+    }
+    
+    // Update item quantity in cart
+    const result = await db.collection('carts').updateOne(
+      { user_id: userId, 'items.product_id': productId },
+      { 
+        $set: { 
+          'items.$.quantity': newQuantity,
+          updatedAt: new Date()
+        }
+      }
+    );
+    
+    if (result.matchedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Item not found in cart'
+      });
+    }
+    
+    if (result.modifiedCount === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Failed to update cart item'
+      });
+    }
+    
+    // Fetch updated cart
+    const updatedCart = await db.collection('carts').findOne({ user_id: userId });
+    
+    // Calculate total price
+    let totalPrice = 0;
+    if (updatedCart && updatedCart.items) {
+      updatedCart.items.forEach(item => {
+        const price = parseFloat(item.product_prize.toString().replace('$', ''));
+        if (!isNaN(price)) {
+          totalPrice += price * item.quantity;
+        }
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Cart updated successfully',
+      cart: {
+        items: updatedCart?.items || [],
+        total_items: updatedCart?.items?.length || 0,
+        total_price: `$${totalPrice.toFixed(2)}`
+      }
+    });
+  } catch (err) {
+    console.error('Error updating cart:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update cart',
+      details: err.message
+    });
+  }
+});
+
+// Clear entire cart
+app.post('/user/clear_cart', async (req, res) => {
+  try {
+    const { user_id } = req.body;
+    
+    // Check if user_id is provided in body or session
+    let userId;
+    if (user_id) {
+      // User ID provided in body
+      const { ObjectId } = require('mongodb');
+      try {
+        userId = new ObjectId(user_id);
+      } catch (err) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid user_id format'
+        });
+      }
+    } else if (req.session.userId) {
+      // User ID from session
+      const { ObjectId } = require('mongodb');
+      userId = new ObjectId(req.session.userId);
+    } else {
+      return res.status(401).json({
+        success: false,
+        error: 'You must be logged in or provide user_id to clear cart'
+      });
+    }
+    
+    // Clear all items from cart
+    const result = await db.collection('carts').updateOne(
+      { user_id: userId },
+      { 
+        $set: { 
+          items: [],
+          updatedAt: new Date()
+        }
+      }
+    );
+    
+    if (result.matchedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Cart not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Cart cleared successfully',
+      cart: {
+        items: [],
+        total_items: 0,
+        total_price: '$0.00'
+      }
+    });
+  } catch (err) {
+    console.error('Error clearing cart:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to clear cart',
+      details: err.message
     });
   }
 });
