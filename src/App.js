@@ -4,6 +4,7 @@ import Home from './views/Home';
 import Deals from './views/deals';
 import SellerRegister from './views/sellerRegister';
 import SellerLogin from './views/sellerLogin';
+import UserRegister from './views/userRegister';
 import SellerAdminPannel from './views/sellerAdminPannel';
 import MakeShop from './component/makeShop';
 import MakeProductForm from './component/makeProductForm';
@@ -18,8 +19,10 @@ function AppContent() {
         <Route path="/deals" element={<Deals />} />
         <Route path="/seller-register" element={<SellerRegister />} />
         <Route path="/seller-login" element={<SellerLogin />} />
+        <Route path="/user-register" element={<UserRegister />} />
         <Route path="/seller_account/register" element={<SellerRegister />} />
         <Route path="/seller_account/login" element={<SellerLogin />} />
+        <Route path="/user/register" element={<UserRegister />} />
         
         {/* Protected seller routes */}
         <Route 

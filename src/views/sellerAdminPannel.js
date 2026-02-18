@@ -3,6 +3,9 @@ import { useLocation } from 'react-router-dom';
 import StorePannelSidebar from '../component/storePannelSidebar';
 import MakeProductForm from '../component/makeProductForm';
 import SellingProducts from '../component/sellingProducts';
+import OrdersList from '../component/ordersList';
+import OrderHistory from '../component/orderHistory';
+import EditSellerProfile from '../component/editSellerProfile';
 import { FaBars, FaTimes } from 'react-icons/fa';
 import '../App.css';
 
@@ -51,6 +54,21 @@ const SellerAdminPannel = () => {
     // Check if we're on the products route
     if (location.pathname.includes('/products')) {
       return <SellingProducts />;
+    }
+
+    // Check if we're on the orders route
+    if (location.pathname.includes('/orders')) {
+      return <OrdersList />;
+    }
+
+    // Check if we're on the order history route
+    if (location.pathname.includes('/order-history')) {
+      return <OrderHistory />;
+    }
+
+    // Check if we're on the edit profile route
+    if (location.pathname.includes('/edit-profile')) {
+      return <EditSellerProfile />;
     }
 
     // Default content - show product form if no products, otherwise dashboard

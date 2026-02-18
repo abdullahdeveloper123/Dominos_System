@@ -8,11 +8,10 @@ const StorePannelSidebar = () => {
   const menuItems = [
     { name: 'Home', path: '/seller_account/' },
     { name: 'Products', path: '/seller_account/products' },
-    { name: 'Orders', path: '#' },
-    { name: 'Order History', path: '#' },
+    { name: 'Orders', path: '/seller_account/orders' },
+    { name: 'Order History', path: '/seller_account/order-history' },
     { name: 'Banners', path: '#' },
-    { name: 'Edit profile', path: '#' },
-    { name: 'Edit page', path: '#' }
+    { name: 'Edit profile', path: '/seller_account/edit-profile' },
   ];
 
   return (

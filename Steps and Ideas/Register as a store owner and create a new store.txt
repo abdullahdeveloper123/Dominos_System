@@ -37,14 +37,35 @@ A store's admin pannel where store owner can controll everything related to thei
 
 2. Land to Store owner pannel
 
+Currently, these routes accept seller_id via POST request body instead of using session middleware:
+
+/make_shop - Creates a hotel/shop for the seller
+/check_seller_hotel - Checks if seller has a hotel
+/add_product - Adds a product for the seller
+/check_seller_products - Checks if seller has any products
+/get_seller_products - Fetches all products for the seller
 
 
 
 
-
-
-
-
+current order payload : {address
+: 
+"hj"}
+{product_id
+: 
+"69945a9969db5eba3cb7c8f1"}
+{product_quantity
+: 
+1}
+{store_id
+: 
+"69945a7f69db5eba3cb7c8ee"}
+{total_price
+: 
+"32.00$"}
+{user_id
+: 
+"guest_user"} --guest user cannot make order, need to register to grab user id, make registeration as normal user
 
 
 

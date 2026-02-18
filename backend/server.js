@@ -18,13 +18,15 @@ app.use(cors({
 // Session middleware
 app.use(session({
   secret: 'your-secret-key-change-in-production', // Change this in production
-  resave: false,
+  resave: true, // Changed to true to save session on every request
   saveUninitialized: false,
   cookie: {
     secure: false, // Set to true if using HTTPS in production
     httpOnly: true,
-    maxAge: 1000 * 60 * 60 * 24 * 7 // 7 days
-  }
+    maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+    sameSite: 'lax' // Added for better cross-origin handling
+  },
+  rolling: true // Reset maxAge on every response
 }));
 
 // Middleware to log requests
@@ -182,6 +184,247 @@ app.get('/seller_account/logout', (req, res) => {
       message: 'Logout successful'
     });
   });
+});
+
+// Get seller profile for editing
+app.get('/seller_account/edit_seller_profile', async (req, res) => {
+  try {
+    // Check if seller is logged in
+    if (!req.session.sellerId) {
+      return res.status(401).json({
+        success: false,
+        error: 'You must be logged in to view profile'
+      });
+    }
+    
+    // Convert string to ObjectId
+    const { ObjectId } = require('mongodb');
+    const sellerId = new ObjectId(req.session.sellerId);
+    
+    // Fetch seller details
+    const seller = await db.collection('sellers').findOne({ _id: sellerId });
+    
+    if (!seller) {
+      return res.status(404).json({
+        success: false,
+        error: 'Seller not found'
+      });
+    }
+    
+    // Return seller details without password
+    res.json({
+      success: true,
+      seller: {
+        id: seller._id,
+        name: seller.name,
+        email: seller.email,
+        phone: seller.phone,
+        address: seller.address
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching seller profile:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch seller profile'
+    });
+  }
+});
+
+// Update seller profile
+app.post('/seller_account/edit_seller_profile', async (req, res) => {
+  try {
+    const { name, email, phone, address, password } = req.body;
+    
+    // Check if seller is logged in
+    if (!req.session.sellerId) {
+      return res.status(401).json({
+        success: false,
+        error: 'You must be logged in to update profile'
+      });
+    }
+    
+    // Validate required fields (password is optional)
+    if (!name || !email || !phone || !address) {
+      return res.status(400).json({
+        success: false,
+        error: 'All fields are required: name, email, phone, address'
+      });
+    }
+    
+    // Convert string to ObjectId
+    const { ObjectId } = require('mongodb');
+    const sellerId = new ObjectId(req.session.sellerId);
+    
+    // Check if email is being changed and if it already exists for another seller
+    if (email !== req.session.sellerEmail) {
+      const existingSeller = await db.collection('sellers').findOne({ 
+        email,
+        _id: { $ne: sellerId }
+      });
+      
+      if (existingSeller) {
+        return res.status(409).json({
+          success: false,
+          error: 'Email already exists for another seller'
+        });
+      }
+    }
+    
+    // Prepare update data
+    const updateData = {
+      name,
+      email,
+      phone,
+      address,
+      updatedAt: new Date()
+    };
+    
+    // If password is provided, hash and update it
+    if (password && password.trim() !== '') {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      updateData.password = hashedPassword;
+    }
+    
+    // Update seller profile
+    const result = await db.collection('sellers').updateOne(
+      { _id: sellerId },
+      { $set: updateData }
+    );
+    
+    if (result.modifiedCount === 0 && result.matchedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Seller not found'
+      });
+    }
+    
+    // Update session with new email and name
+    req.session.sellerEmail = email;
+    req.session.sellerName = name;
+    
+    // Fetch updated seller
+    const updatedSeller = await db.collection('sellers').findOne({ _id: sellerId });
+    
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      seller: {
+        id: updatedSeller._id,
+        name: updatedSeller.name,
+        email: updatedSeller.email,
+        phone: updatedSeller.phone,
+        address: updatedSeller.address
+      }
+    });
+  } catch (err) {
+    console.error('Error updating seller profile:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update seller profile'
+    });
+  }
+});
+
+// User registration route
+app.post('/user/register', async (req, res) => {
+  try {
+    const { name, address, password } = req.body;
+    
+    // Validate required fields
+    if (!name || !address || !password) {
+      return res.status(400).json({
+        success: false,
+        error: 'All fields are required: name, address, password'
+      });
+    }
+    
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    // Create user document
+    const user = {
+      name,
+      address,
+      password: hashedPassword,
+      createdAt: new Date()
+    };
+    
+    const result = await db.collection('users').insertOne(user);
+    
+    // Create session after registration
+    req.session.userId = result.insertedId;
+    req.session.userEmail = null; // No email in registration
+    
+    res.status(201).json({
+      success: true,
+      message: 'User registered successfully',
+      user: {
+        id: result.insertedId,
+        name: name,
+        address: address
+      }
+    });
+  } catch (err) {
+    console.error('Error registering user:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to register user'
+    });
+  }
+});
+
+// User login route
+app.post('/user/login', async (req, res) => {
+  try {
+    const { name, password } = req.body;
+    
+    // Validate required fields
+    if (!name || !password) {
+      return res.status(400).json({
+        success: false,
+        error: 'Name and password are required'
+      });
+    }
+    
+    // Find user by name
+    const user = await db.collection('users').findOne({ name });
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid name or password'
+      });
+    }
+    
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid name or password'
+      });
+    }
+    
+    // Create session
+    req.session.userId = user._id;
+    req.session.userEmail = null; // No email field
+    
+    res.json({
+      success: true,
+      message: 'Login successful',
+      user: {
+        id: user._id,
+        name: user.name,
+        address: user.address
+      }
+    });
+  } catch (err) {
+    console.error('Error logging in user:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to login'
+    });
+  }
 });
 
 // Make shop route - add hotel to city
@@ -777,7 +1020,8 @@ app.post('/create_order', async (req, res) => {
     } catch (err) {
       return res.status(400).json({
         success: false,
-        error: 'Invalid user_id, product_id, or store_id format'
+        error: 'Invalid user_id, product_id, or store_id format',
+        details: err.message
       });
     }
     
@@ -791,13 +1035,26 @@ app.post('/create_order', async (req, res) => {
       });
     }
     
-    // Fetch store details
-    const store = await db.collection('hotels').findOne({ _id: storeId });
+    // Fetch store details - try by _id first, then by hotel_name and city_name from product
+    let store = await db.collection('hotels').findOne({ _id: storeId });
+    
+    if (!store) {
+      // If not found by _id, try finding by hotel_name and city_name from the product
+      store = await db.collection('hotels').findOne({ 
+        hotel_name: product.hotel_name,
+        city_name: product.city_name
+      });
+    }
     
     if (!store) {
       return res.status(404).json({
         success: false,
-        error: 'Store not found'
+        error: 'Store not found',
+        debug: {
+          store_id: store_id,
+          product_hotel: product.hotel_name,
+          product_city: product.city_name
+        }
       });
     }
     
@@ -810,7 +1067,7 @@ app.post('/create_order', async (req, res) => {
       product_quantity: parseInt(product_quantity),
       total_price: total_price,
       delivery_address: address,
-      store_id: storeId,
+      store_id: store._id,
       seller_id: store.seller_id,
       hotel_name: store.hotel_name,
       city_name: store.city_name,
@@ -830,7 +1087,8 @@ app.post('/create_order', async (req, res) => {
     console.error('Error creating order:', err);
     res.status(500).json({
       success: false,
-      error: 'Failed to create order'
+      error: 'Failed to create order',
+      details: err.message
     });
   }
 });
@@ -941,6 +1199,132 @@ app.post('/get_products', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to fetch products'
+    });
+  }
+});
+
+// Get all orders for the logged-in seller
+app.get('/all_orders', async (req, res) => {
+  try {
+    // Check if seller is logged in
+    if (!req.session.sellerId) {
+      return res.status(401).json({
+        success: false,
+        error: 'You must be logged in as a seller to view orders'
+      });
+    }
+    
+    // Convert string to ObjectId
+    const { ObjectId } = require('mongodb');
+    const sellerId = new ObjectId(req.session.sellerId);
+    
+    // Fetch all orders for this seller
+    const orders = await db.collection('orders')
+      .find({ seller_id: sellerId })
+      .sort({ createdAt: -1 }) // Sort by newest first
+      .toArray();
+    
+    res.json({
+      success: true,
+      orders: orders,
+      totalOrders: orders.length
+    });
+  } catch (err) {
+    console.error('Error fetching orders:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch orders'
+    });
+  }
+});
+
+// Update order status
+app.post('/update_order_status', async (req, res) => {
+  try {
+    const { order_id, order_status } = req.body;
+    
+    // Check if seller is logged in
+    if (!req.session.sellerId) {
+      return res.status(401).json({
+        success: false,
+        error: 'You must be logged in as a seller to update order status'
+      });
+    }
+    
+    // Validate required fields
+    if (!order_id || !order_status) {
+      return res.status(400).json({
+        success: false,
+        error: 'order_id and order_status are required'
+      });
+    }
+    
+    // Validate order_status value
+    const validStatuses = ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'];
+    if (!validStatuses.includes(order_status)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid order_status. Must be one of: ${validStatuses.join(', ')}`
+      });
+    }
+    
+    // Convert strings to ObjectId
+    const { ObjectId } = require('mongodb');
+    let orderId, sellerId;
+    try {
+      orderId = new ObjectId(order_id);
+      sellerId = new ObjectId(req.session.sellerId);
+    } catch (err) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid order_id format'
+      });
+    }
+    
+    // Verify order belongs to the logged-in seller
+    const existingOrder = await db.collection('orders').findOne({ 
+      _id: orderId,
+      seller_id: sellerId 
+    });
+    
+    if (!existingOrder) {
+      return res.status(404).json({
+        success: false,
+        error: 'Order not found or you do not have permission to update it'
+      });
+    }
+    
+    // Update order status
+    const result = await db.collection('orders').updateOne(
+      { _id: orderId, seller_id: sellerId },
+      { 
+        $set: { 
+          order_status: order_status,
+          updatedAt: new Date()
+        } 
+      }
+    );
+    
+    if (result.modifiedCount === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Failed to update order status'
+      });
+    }
+    
+    // Fetch updated order
+    const updatedOrder = await db.collection('orders').findOne({ _id: orderId });
+    
+    res.json({
+      success: true,
+      message: 'Order status updated successfully',
+      order: updatedOrder
+    });
+  } catch (err) {
+    console.error('Error updating order status:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update order status'
     });
   }
 });

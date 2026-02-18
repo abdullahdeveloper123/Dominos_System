@@ -1,10 +1,21 @@
 import { useState } from 'react';
+import ProductDetailModal from './productDetailModal';
 
 const ProductCard = ({ product }) => {
   const [isFavorite, setIsFavorite] = useState(false);
+  const [showModal, setShowModal] = useState(false);
 
-  const handleFavoriteClick = () => {
+  const handleFavoriteClick = (e) => {
+    e.stopPropagation(); // Prevent card click
     setIsFavorite(!isFavorite);
+  };
+
+  const handleCardClick = () => {
+    setShowModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
   };
 
   // Handle different possible field names from API
@@ -16,7 +27,15 @@ const ProductCard = ({ product }) => {
   const isNew = product.isNew || product.is_new || false;
 
   return (
-    <div className="product-card">
+    <>
+      {showModal && (
+        <ProductDetailModal 
+          product={product} 
+          onClose={handleCloseModal}
+        />
+      )}
+
+      <div className="product-card" onClick={handleCardClick}>
       {/* Hidden input to store product ID */}
       <input 
         type="hidden" 
@@ -62,6 +81,7 @@ const ProductCard = ({ product }) => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 
